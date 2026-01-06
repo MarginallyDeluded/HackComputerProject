@@ -1,0 +1,69 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/1/And.hdl
+/**
+ * And gate:
+ * if (a and b) out = 1, else out = 0 
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    //A instruction load
+    Not(in=instruction[15] , out=n15 );
+    Not(in=instruction[5] , out=n5 );
+    And(a=n15 , b=n5 , out=loadA0 );
+    And(a=instruction[5] , b=n15 , out=loadA1 );
+    //C instruction load
+    And(a=instruction[5] , b=instruction[15] , out=loadC);
+    Or(a=loadA0 , b=loadA1 , out=load0 );
+    Or(a=load0 , b=loadC , out=loadA );
+    //A regsiter load
+	Mux16(a=instruction , b=ALUout , sel=instruction[15] , 
+    out=out0 );
+    ARegister(in=out0 , load=loadA , out=outA, 
+    out[0..14]=addressM ); 
+
+    //ALU Operation
+    And(a=instruction[15] , b=instruction[12] , out=lAM );
+    Mux16(a=outA , b=inM , sel=lAM , out=ALU0 );
+    And(a=instruction[15] , b=instruction[4] , out=lD );
+    DRegister(in=ALUout , load=lD , out=ALU1 );
+    ALU(x=ALU1 , y=ALU0 , zx=instruction[11] , 
+    nx=instruction[10] , 
+    zy=instruction[9] , 
+    ny=instruction[8] , f=instruction[7] , 
+    no=instruction[6] , out=ALUout , 
+    zr=C1 , ng=C2 );
+    And16(a=ALUout , b=true , out=outM );
+    And(a=instruction[15] , b=instruction[3] , out=writeM );
+
+    //Program Counter operation
+    And(a=instruction[2] , b=instruction[15] , out=j1 );
+    And(a=instruction[1] , b=instruction[15] , out=j2 );
+    And(a=instruction[0] , b=instruction[15] , out=j3 );
+    //getting the pos flag
+    Or(a=C2 , b=C1 , out=cpos );
+    Not(in=cpos , out=pos ); 
+    And(a=C2 , b=j1 , out=l1 ); //jlt
+    And(a=C1 , b=j2 , out=l2 ); //jeq
+    And(a=pos , b=j3 , out=l3 ); //jgt
+    //evaluating the load bit and inc bit
+    Or(a=l1 , b=l2 , out=r0 );
+    Or(a=r0 , b=l3 , out=outl );
+    
+
+    PC(in=outA , load=outl , inc=true , reset=reset ,
+    out[0..14]=pc );
+}
